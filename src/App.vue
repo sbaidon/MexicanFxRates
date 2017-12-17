@@ -1,12 +1,62 @@
 <template>
   <div id="app">
     <Chart :chartValues="chartValues"></Chart>
-    <select v-model="selectYear">
-      <option value="All years">All Years</option>
-      <option v-once v-for="(value, index) in years" :key="index" :value="value">{{ value }}</option>
-    </select>
+
+    <div class="field is-horizontal">
+      <div class="field-label is-normal">
+        <label class="label">Years</label>
+      </div>
+      <div class="field-body">
+        <div class="field is-narrow">
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select v-model="selectYear">
+                <option value="All years">All Years</option>
+                <option v-once v-for="(value, index) in years" :key="index" :value="value">{{ value }}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="field is-horizontal">
+      <div class="field-label is-normal">
+        <label class="label">Months</label>
+      </div>
+      <div class="field-body">
+        <div class="field is-narrow">
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select name="months" v-model="selectMonth" :disabled="isAllYearsSelected">
+                <option value="">Select a Month</option>
+                <option v-for="(value, index) in months" :key="index" :value="value"> {{ value }}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<div class="field is-horizontal">
+  <div class="field-label is-normal">
+      <label class="label">Currencies</label>
+   </div>
+  <div class="field-body">
+    <div class="field is-narrow">
+      <label class="label checkbox" v-for="(currency, index) in allCurrencies" :key="index">
+        <input type="checkbox" :value="currency" v-model="currencies">
+        {{ currency }}
+      </label>
+    </div>
   </div>
+</div>
+
+
+  </div>
+
 </template>
+
 
 <script>
 import Chart from './components/Chart';
@@ -20,10 +70,26 @@ export default {
   data() {
     return {
       firstYearInRecord: 2008,
+      allCurrencies: ['GBP', 'USD', 'EUR', 'AUD', 'JPY', 'CAD'],
       currencies: ['GBP', 'USD', 'EUR'],
       selectYear: 'All years',
+      selectMonth: '',
       rates: [],
-      years: []
+      years: [],
+      months: [
+        '01',
+        '02',
+        '03',
+        '04',
+        '05',
+        '06',
+        '07',
+        '08',
+        '09',
+        '10',
+        '11',
+        '12'
+      ]
     };
   },
   async created() {
@@ -31,16 +97,28 @@ export default {
   },
   watch: {
     async selectYear(year) {
-      if (year === 'All years') {
-        this.rates = await this.getYearlyRates();
+      if (this.isAllYearsSelected) {
+        this.rates = await this.getYearlyRates().catch(this.handleError);
         return;
       }
-      this.rates = await this.getMonthlyRates(year);
+      this.rates = await this.getMonthlyRates(year).catch(this.handleError);
+    },
+    async selectMonth(month) {
+      if (month === '') return;
+
+      this.rates = await this.getDailyRates(this.selectYear, month).catch(
+        this.handleError
+      );
     }
   },
   computed: {
+    isAllYearsSelected() {
+      return this.selectYear === 'All years';
+    },
     xValues() {
-      return this.rates.map(rates => rates.date);
+      if (!this.rates) return [];
+
+      return this.rates.map(rate => rate.date);
     },
     yValues() {
       return Object.keys(this.valuesByCurrency).map(
@@ -48,8 +126,10 @@ export default {
       );
     },
     valuesByCurrency() {
+      if (!this.rates) return {};
+
+      const currencies = this.currencies;
       return this.rates.map(rate => rate.rates).reduce((obj, rates) => {
-        const currencies = this.currencies;
         currencies.forEach(currency => {
           if (!obj.hasOwnProperty(currency)) {
             obj[currency] = [currency];
@@ -61,6 +141,17 @@ export default {
     },
     chartValues() {
       return { xValues: this.xValues, yValues: this.yValues };
+    },
+    days() {
+      const days = [];
+      for (let i = 1; i < 10; i++) {
+        days.push(`0${i.toString()}`);
+      }
+
+      for (let i = 10; i <= 31; i++) {
+        days.push(i.toString());
+      }
+      return days;
     }
   },
   methods: {
@@ -77,27 +168,26 @@ export default {
       return responses.map(response => response.data);
     },
     async getMonthlyRates(year) {
-      const months = [
-        '01',
-        '02',
-        '03',
-        '04',
-        '05',
-        '06',
-        '07',
-        '08',
-        '09',
-        '10',
-        '11',
-        '12'
-      ];
       const responses = await Promise.all(
-        months.map(month => api.getRatesByDate(`${year}-${month}-15`))
+        this.months.map(month => api.getRatesByDate(`${year}-${month}-15`))
+      );
+      return responses.map(response => response.data);
+    },
+    async getDailyRates(year, month) {
+      const responses = await Promise.all(
+        this.days.map(day => api.getRatesByDate(`${year}-${month}-${day}`))
       );
       return responses.map(response => response.data);
     },
     getCurrentYear() {
       return new Date().getFullYear();
+    },
+    handleError() {
+      this.selectMonth = '';
+      this.selectYear = 'All years';
+    },
+    isSelectedCurrency(currency) {
+      return this.currencies.includes(currency);
     }
   }
 };

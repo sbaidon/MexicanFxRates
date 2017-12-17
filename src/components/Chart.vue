@@ -1,6 +1,6 @@
 <template>
 <div>
-  <h1>MXN foreign exchange between currencies</h1>
+  <h1>MXN foreign exchange</h1>
   <div id="chart">
   </div>
 </div>
@@ -26,7 +26,8 @@ export default {
         bindto: '#chart',
         data: {
           x: 'x',
-          columns: [['x', ...xValues], ...yValues]
+          columns: [['x', ...xValues], ...yValues],
+          type: 'spline'
         },
         axis: {
           x: {
