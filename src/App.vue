@@ -1,6 +1,10 @@
 <template>
   <div id="app">
     <Chart :chartValues="chartValues"></Chart>
+    <select v-model="selectYear">
+      <option value="All years">All Years</option>
+      <option v-once v-for="(value, index) in years" :key="index" :value="value">{{ value }}</option>
+    </select>
   </div>
 </template>
 
@@ -10,43 +14,42 @@ import api from './api';
 
 export default {
   name: 'app',
-  data() {
-    return {
-      firstYearInRecord: 2008,
-      chartValues: {},
-      currencies: ['GBP', 'JPY', 'USD', 'EUR']
-    };
-  },
   components: {
     Chart
   },
-  async created() {
-    const responses = await Promise.all(this.getYearlyRates());
-    const xValues = responses.map(response => response.data.date);
-    const valuesByCurrency = this.getValuesByCurrency(
-      responses.map(response => response.data.rates)
-    );
-    const yValues = Object.keys(valuesByCurrency).map(
-      currency => valuesByCurrency[currency]
-    );
-    this.chartValues = { xValues, yValues };
+  data() {
+    return {
+      firstYearInRecord: 2008,
+      currencies: ['GBP', 'USD', 'EUR'],
+      selectYear: 'All years',
+      rates: [],
+      years: []
+    };
   },
-  methods: {
-    getYearlyRates() {
-      const end = this.getCurrentYear();
-      const years = [];
-      /* eslint no-plusplus: ["error", { "allowForLoopAfterthoughts": true }] */
-      for (let start = this.firstYearInRecord; start <= end; start++) {
-        years.push(start);
+  async created() {
+    this.rates = await this.getYearlyRates();
+  },
+  watch: {
+    async selectYear(year) {
+      if (year === 'All years') {
+        this.rates = await this.getYearlyRates();
+        return;
       }
-      return years.map(year => api.getRatesByDate(`${year}-12-31`));
+      this.rates = await this.getMonthlyRates(year);
+    }
+  },
+  computed: {
+    xValues() {
+      return this.rates.map(rates => rates.date);
     },
-    getCurrentYear() {
-      return new Date().getFullYear();
+    yValues() {
+      return Object.keys(this.valuesByCurrency).map(
+        currency => this.valuesByCurrency[currency]
+      );
     },
-    getValuesByCurrency(ratesList) {
-      return ratesList.reduce((obj, rates) => {
-        const currencies = Object.keys(rates);
+    valuesByCurrency() {
+      return this.rates.map(rate => rate.rates).reduce((obj, rates) => {
+        const currencies = this.currencies;
         currencies.forEach(currency => {
           if (!obj.hasOwnProperty(currency)) {
             obj[currency] = [currency];
@@ -55,6 +58,46 @@ export default {
         });
         return obj;
       }, {});
+    },
+    chartValues() {
+      return { xValues: this.xValues, yValues: this.yValues };
+    }
+  },
+  methods: {
+    async getYearlyRates() {
+      const end = this.getCurrentYear();
+      this.years = [];
+      /* eslint no-plusplus: ["error", { "allowForLoopAfterthoughts": true }] */
+      for (let start = this.firstYearInRecord; start <= end; start++) {
+        this.years.push(start);
+      }
+      const responses = await Promise.all(
+        this.years.map(year => api.getRatesByDate(`${year}-12-31`))
+      );
+      return responses.map(response => response.data);
+    },
+    async getMonthlyRates(year) {
+      const months = [
+        '01',
+        '02',
+        '03',
+        '04',
+        '05',
+        '06',
+        '07',
+        '08',
+        '09',
+        '10',
+        '11',
+        '12'
+      ];
+      const responses = await Promise.all(
+        months.map(month => api.getRatesByDate(`${year}-${month}-15`))
+      );
+      return responses.map(response => response.data);
+    },
+    getCurrentYear() {
+      return new Date().getFullYear();
     }
   }
 };

@@ -1,6 +1,9 @@
 <template>
+<div>
+  <h1>MXN foreign exchange between currencies</h1>
   <div id="chart">
   </div>
+</div>
 </template>
 
 <script>
