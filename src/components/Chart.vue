@@ -1,6 +1,5 @@
 <template>
 <div>
-  <h1>MXN foreign exchange</h1>
   <div id="chart">
   </div>
 </div>
