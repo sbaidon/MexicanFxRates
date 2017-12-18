@@ -26,8 +26,7 @@ export default {
         bindto: '#chart',
         data: {
           x: 'x',
-          columns: [['x', ...xValues], ...yValues],
-          type: 'spline'
+          columns: [['x', ...xValues], ...yValues]
         },
         axis: {
           x: {

@@ -6,7 +6,9 @@
     {{ notification }}
   </div>
 
+  <h1>MXN foreign exchange</h1>
   <Chart :chartValues="chartValues"></Chart>
+
   <div class="field is-horizontal">
     <div class="field-label is-normal">
       <label class="label">Years</label>
@@ -44,12 +46,12 @@
   </div>
 
   <div class="field is-horizontal">
-    <div class="field-label is-normal">
+    <div class="field-label">
       <label class="label">Currencies</label>
     </div>
     <div class="field-body">
-      <div class="field is-narrow">
-        <label class="label checkbox" v-for="(currency, index) in allCurrencies" :key="index">
+      <div class="field is-narrow" v-for="(currency, index) in allCurrencies" :key="index">
+        <label class="label checkbox">
           <input type="checkbox" :value="currency" v-model="currencies"> {{ currency }}
         </label>
       </div>
@@ -72,11 +74,14 @@ export default {
   data() {
     return {
       firstYearInRecord: 2008,
+      // All available currencies
       allCurrencies: ['GBP', 'USD', 'EUR', 'AUD', 'JPY', 'CAD'],
+      // Currently selected currencies
       currencies: ['GBP', 'USD', 'EUR'],
       selectYear: 'All years',
       selectMonth: '',
       notification: '',
+      notificationLapse: 5000,
       rates: []
     };
   },
@@ -103,19 +108,23 @@ export default {
     isAllYearsSelected() {
       return this.selectYear === 'All years';
     },
+    // x-axis values which correspond to the dates for the c3 chart
     xValues() {
       if (!this.rates) return [];
 
       return this.rates.map(rate => rate.date);
     },
+    // y-axis values which correspond to an array of rates for a specific currency
     yValues() {
-      return Object.keys(this.valuesByCurrency).map(
-        currency => this.valuesByCurrency[currency]
+      return Object.keys(this.ratesByCurrency).map(
+        currency => this.ratesByCurrency[currency]
       );
     },
-    valuesByCurrency() {
+    // Grouped rates by currency
+    ratesByCurrency() {
+      // If there are no rates array return an empty object
       if (!this.rates) return {};
-
+      // Use currencies which are part of the 'selected' currencies array
       const currencies = this.currencies;
       return this.rates.map(rate => rate.rates).reduce((obj, rates) => {
         currencies.forEach(currency => {
@@ -127,6 +136,7 @@ export default {
         return obj;
       }, {});
     },
+    // values needed for the graph to render
     chartValues() {
       return { xValues: this.xValues, yValues: this.yValues };
     },
@@ -162,7 +172,9 @@ export default {
     }
   },
   methods: {
+    // Returns the rates for all currencies since the firstYearInRecord (2008) to the current year
     async getYearlyRates() {
+      // Check if values are available on local storage
       const yearlyRates = this.retrieve('yearlyRates');
       if (yearlyRates) {
         return yearlyRates;
@@ -172,10 +184,13 @@ export default {
         this.years.map(year => api.getRatesByDate(`${year}-12-31`))
       );
       const data = responses.map(response => response.data);
+      // Store value in local storage for future lookups
       this.store('yearlyRates', data);
       return data;
     },
+    // Returns the rates for all currencies over a specific year
     async getMonthlyRates(year) {
+      // Check if values are available on local storage
       const monthlyRates = this.retrieve(year);
       if (monthlyRates) {
         return monthlyRates;
@@ -185,10 +200,14 @@ export default {
         this.months.map(month => api.getRatesByDate(`${year}-${month}-15`))
       );
       const data = responses.map(response => response.data);
+      // Store values for future lookups
       this.store(year, data);
+
       return data;
     },
+    // Returns the rates for all currencies over specific year
     async getDailyRates(year, month) {
+      // Check if values are available on local storage
       const dailyRates = this.retrieve(`${year}-${month}`);
       if (dailyRates) {
         return dailyRates;
@@ -197,7 +216,9 @@ export default {
       const responses = await Promise.all(
         this.days.map(day => api.getRatesByDate(`${year}-${month}-${day}`))
       );
+
       const data = responses.map(response => response.data);
+      // Store values for future lookups
       this.store(`${year}-${month}`);
       return data;
     },
@@ -210,6 +231,7 @@ export default {
     getCurrentYear() {
       return new Date().getFullYear();
     },
+    // Handle conectivity errors agains Fixer API
     handleError(error) {
       this.selectMonth = '';
       this.selectYear = 'All years';
@@ -217,12 +239,13 @@ export default {
         `There was a ${error.message}, therefore there is missing data, please select another date`
       );
     },
+    // Sets a notification with a specific message, automatically dissapears after 5 seconds
     setNotification(message) {
       this.notification = message;
       this.timeout = setTimeout(() => {
         this.notification = '';
         clearTimeout(this.timeout);
-      }, 5000);
+      }, this.notificationLapse);
     }
   }
 };
